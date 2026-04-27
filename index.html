@@ -113,7 +113,7 @@
         </div>
         
         <div class="controls-row">
-            <div id="timer">02:25</div>
+            <div id="timer">01:30</div>
             <button onclick="spinWheel()" id="spinBtn" class="btn-main" style="background:var(--spotify-green); color:white;">SPIN WHEEL</button>
             <button onclick="earlyStop()" id="stopBtn" class="btn-main" style="background:#e74c3c; color:white; display:none;">STOP</button>
         </div>
@@ -234,7 +234,6 @@
             currentRotation += (360 * 5) + stopAngle - (currentRotation % 360);
             canvas.style.transform = `rotate(${currentRotation}deg)`;
             
-            // 4s spin + 5s wait = 9000ms
             setTimeout(() => { 
                 document.getElementById('modeModal').style.display = 'flex';
             }, 9000); 
@@ -250,7 +249,8 @@
         }
 
         function startTimer() {
-            let time = 145; clearInterval(countdownInterval);
+            let time = 90; // Set to 1:30 (90 seconds)
+            clearInterval(countdownInterval);
             countdownInterval = setInterval(() => {
                 time--; let m = Math.floor(time/60), s = time%60;
                 document.getElementById('timer').innerText = `0${m}:${s<10?'0':''}${s}`;
@@ -272,7 +272,7 @@
             else { score2 += pts; document.getElementById('s2').innerText = score2; currentTeam = 1; }
             turnCount++;
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-            document.getElementById('timer').innerText = "02:25";
+            document.getElementById('timer').innerText = "01:30"; // Reset to 1:30
             document.getElementById('stopBtn').style.display = 'none';
             document.getElementById('spinBtn').style.display = 'inline-block';
             document.getElementById('mode-display').innerText = "SPIN TO START";
@@ -298,4 +298,3 @@
     </script>
 </body>
 </html>
-
