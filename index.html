@@ -1,310 +1,245 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Karaoke Roulette</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karaoke Roulette</title>
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: black; color: white; font-family: 'Arial Black', sans-serif;
+            overflow: hidden;
+        }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .active { display: flex; }
 
-<style>
-body{
-  margin:0;
-  background:black;
-  color:white;
-  font-family:Arial;
-  text-align:center;
-}
+        /* Intro Animation Styles */
+        #intro-text { position: relative; width: 400px; height: 400px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 1s; }
+        .letter {
+            position: absolute; font-size: 40px; color: black; font-weight: bold;
+            -webkit-text-stroke: 2px white; text-transform: uppercase;
+        }
+        .decade-bg { position: absolute; font-size: 30px; opacity: 0; color: #444; z-index: -1; }
 
-/* CENTER */
-.center{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  height:100vh;
-}
+        /* Wheel Styles */
+        .wheel-container { display: flex; gap: 50px; margin-top: 20px; }
+        canvas { border-radius: 50%; border: 5px solid white; transition: transform 4s cubic-bezier(0.1, 0, 0, 1); }
+        .disabled-wheel { filter: grayscale(1); opacity: 0.5; pointer-events: none; }
 
-/* TITLE */
-#titleWheel{
-  font-size:8vw;
-  font-weight:bold;
-  color:red;
-  -webkit-text-stroke:2px white;
-  animation:spin 4s ease-out forwards;
-}
-
-@keyframes spin{
-  0%{transform:rotate(0deg);}
-  100%{transform:rotate(1080deg);}
-}
-
-/* DECADES FLOAT */
-.decade{
-  position:absolute;
-  font-size:4vw;
-  opacity:0;
-  animation:flicker 3s infinite;
-}
-
-@keyframes flicker{
-  0%,100%{opacity:0;}
-  50%{opacity:1;}
-}
-
-/* GAME */
-.topBar{
-  display:flex;
-  justify-content:space-between;
-  padding:10px;
-  font-size:20px;
-}
-
-canvas{
-  margin:10px;
-}
-
-button{
-  padding:10px 20px;
-  font-size:18px;
-  margin:5px;
-}
-
-.grey{
-  opacity:0.3;
-}
-
-/* WIN SCREEN */
-.winText{
-  font-size:8vw;
-  font-weight:bold;
-  animation:rainbow 2s infinite linear;
-}
-
-@keyframes rainbow{
-  0%{color:red;}
-  20%{color:orange;}
-  40%{color:yellow;}
-  60%{color:green;}
-  80%{color:blue;}
-  100%{color:purple;}
-}
-</style>
+        /* UI Elements */
+        .header { display: flex; justify-content: space-around; width: 100%; padding: 20px; font-size: 24px; }
+        button { padding: 15px 30px; font-size: 20px; cursor: pointer; background: red; color: white; border: none; border-radius: 10px; margin-top: 10px; }
+        input { padding: 10px; font-size: 20px; text-align: center; }
+        
+        #congrats-text { font-size: 80px; white-space: nowrap; animation: scrollText 10s linear infinite; }
+        @keyframes scrollText { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+    </style>
 </head>
-
 <body>
 
-<!-- INTRO -->
-<div id="intro" class="center">
-  <div id="titleWheel">KARAOKE ROULETTE</div>
-</div>
+    <div id="intro-screen" class="screen active">
+        <div id="intro-text"></div>
+        <div id="decades-container"></div>
+    </div>
 
-<!-- TEAM INPUT -->
-<div id="teams" class="center" style="display:none;">
-  <h2>Enter Team Names</h2>
-  <input id="t1" placeholder="Team 1"><br>
-  <input id="t2" placeholder="Team 2"><br>
-  <button onclick="startGame()">Start Game</button>
-</div>
+    <div id="setup-screen" class="screen">
+        <h1>ENTER TEAMS</h1>
+        <input type="text" id="team1-input" placeholder="Team 1 Name"><br>
+        <input type="text" id="team2-input" placeholder="Team 2 Name"><br>
+        <button onclick="startGame()">START GAME</button>
+    </div>
 
-<script>
+    <div id="game-screen" class="screen">
+        <div class="header">
+            <div><span id="t1-name"></span>: <span id="t1-score">0</span></div>
+            <div id="timer">01:30</div>
+            <div><span id="t2-name"></span>: <span id="t2-score">0</span></div>
+        </div>
+        <div id="current-info">
+            <h2 id="display-decade">Spin the Category Wheel!</h2>
+            <h2 id="display-method">---</h2>
+        </div>
+        <div class="wheel-container">
+            <canvas id="wheel1" width="400" height="400"></canvas>
+            <canvas id="wheel2" width="400" height="400" class="disabled-wheel"></canvas>
+        </div>
+        <button id="timer-btn" onclick="toggleTimer()" style="display:none;">START CLOCK</button>
+        <button id="spin-btn" onclick="spinWheel1()">SPIN CATEGORY</button>
+    </div>
 
-/* FLOATING DECADES */
-const decades = ["50s","60s","70s","80s","90s","00s","10s","20s"];
-decades.forEach(d=>{
-  let el=document.createElement("div");
-  el.className="decade";
-  el.innerText=d;
-  el.style.top=Math.random()*90+"%";
-  el.style.left=Math.random()*90+"%";
-  el.style.animationDelay=Math.random()*3+"s";
-  document.body.appendChild(el);
-});
+    <div id="end-screen" class="screen">
+        <div id="congrats-text">CONGRATULATIONS</div>
+        <h1 id="winner-name" style="font-size: 60px;"></h1>
+    </div>
 
-/* INTRO TIMING */
-setTimeout(()=>{
-  document.getElementById("intro").style.display="none";
-  document.getElementById("teams").style.display="flex";
-},6000);
+    <script>
+        // Game State
+        let teams = [{name: "", score: 0}, {name: "", score: 0}];
+        let currentRound = 1;
+        let turn = 0; // 0 for team 1, 1 for team 2
+        let timerSeconds = 90;
+        let timerInterval;
 
-/* GAME STATE */
-let team1, team2;
-let score1=0, score2=0;
-let round=1;
-let currentTeam=1;
-let selectedCategory="";
-let selectedMethod="";
+        // Categories
+        const categories = ["1950s-1970s", "1980s", "1990s", "2000s", "2010s", "2020s", "Audience Choice"];
+        const methods = ["Karaoke", "Name Song/Artist", "Karaoke", "Name Song/Artist", "Karaoke", "Name Song/Artist"];
 
-/* START GAME */
-function startGame(){
-  team1=document.getElementById("t1").value;
-  team2=document.getElementById("t2").value;
+        // 1. INTRO ANIMATION LOGIC
+        window.onload = () => {
+            setTimeout(() => {
+                const introText = document.getElementById('intro-text');
+                introText.style.opacity = '1';
+                createCircleText("KARAOKE ROULETTE", introText);
+                introText.style.transition = "transform 3s";
+                introText.style.transform = "rotate(1080deg)"; // 3 turns
+                
+                // Random Decades
+                const decs = ["50s", "60s", "70s", "80s", "90s", "00s", "10s", "20s"];
+                const interval = setInterval(() => {
+                    const d = document.createElement('div');
+                    d.className = 'decade-bg';
+                    d.innerText = decs[Math.floor(Math.random()*decs.length)];
+                    d.style.left = Math.random()*80 + "%";
+                    d.style.top = Math.random()*80 + "%";
+                    document.getElementById('decades-container').appendChild(d);
+                    setTimeout(() => d.style.opacity = 1, 10);
+                    setTimeout(() => d.style.opacity = 0, 500);
+                }, 200);
 
-  document.body.innerHTML=`
-  <div class="topBar">
-    <div>${team1}: <span id="s1">0</span></div>
-    <div id="round">Round 1/5</div>
-    <div>${team2}: <span id="s2">0</span></div>
-  </div>
+                setTimeout(() => {
+                    clearInterval(interval);
+                    document.getElementById('intro-screen').classList.remove('active');
+                    setTimeout(() => {
+                        document.getElementById('setup-screen').classList.add('active');
+                    }, 5000);
+                }, 4000);
+            }, 1000);
+        };
 
-  <h2 id="turn">${team1}'s Turn</h2>
+        function createCircleText(text, container) {
+            const chars = text.split("");
+            const radius = 150;
+            chars.forEach((char, i) => {
+                const span = document.createElement('span');
+                span.innerText = char;
+                span.className = 'letter';
+                const theta = (i / chars.length) * (Math.PI * 2);
+                span.style.left = 200 + radius * Math.cos(theta) + "px";
+                span.style.top = 200 + radius * Math.sin(theta) + "px";
+                container.appendChild(span);
+            });
+        }
 
-  <canvas id="wheel1" width="250" height="250"></canvas><br>
-  <button onclick="spinCategory()">Spin Category</button>
+        // 2. SETUP
+        function startGame() {
+            teams[0].name = document.getElementById('team1-input').value || "Team 1";
+            teams[1].name = document.getElementById('team2-input').value || "Team 2";
+            document.getElementById('t1-name').innerText = teams[0].name;
+            document.getElementById('t2-name').innerText = teams[1].name;
+            document.getElementById('setup-screen').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+            drawWheel('wheel1', categories);
+            drawWheel('wheel2', methods, true);
+        }
 
-  <canvas id="wheel2" width="250" height="250" class="grey"></canvas><br>
-  <button id="spin2" disabled onclick="spinMethod()">Spin Method</button>
+        // 3. WHEEL DRAWING
+        function drawWheel(canvasId, items, isBlackWhite = false) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const slice = (Math.PI * 2) / items.length;
+            
+            items.forEach((item, i) => {
+                ctx.beginPath();
+                ctx.fillStyle = isBlackWhite ? (i % 2 === 0 ? "black" : "white") : `hsl(${i * 50}, 70%, 50%)`;
+                ctx.moveTo(200, 200);
+                ctx.arc(200, 200, 200, i * slice, (i + 1) * slice);
+                ctx.fill();
+                
+                ctx.save();
+                ctx.translate(200, 200);
+                ctx.rotate(i * slice + slice/2);
+                ctx.fillStyle = isBlackWhite ? (i % 2 === 0 ? "white" : "black") : "black";
+                ctx.font = "bold 16px Arial";
+                ctx.fillText(item, 70, 5);
+                ctx.restore();
+            });
+        }
 
-  <h3 id="category"></h3>
-  <h3 id="method"></h3>
+        // 4. GAME LOGIC
+        function spinWheel1() {
+            const deg = Math.floor(3000 + Math.random() * 3000);
+            document.getElementById('wheel1').style.transform = `rotate(${deg}deg)`;
+            setTimeout(() => {
+                document.getElementById('display-decade').innerText = "Category Selected!";
+                document.getElementById('wheel2').classList.remove('disabled-wheel');
+                document.getElementById('spin-btn').innerText = "SPIN METHOD";
+                document.getElementById('spin-btn').onclick = spinWheel2;
+            }, 4000);
+        }
 
-  <h2 id="timer">1:30</h2>
-  <button id="timerBtn" onclick="toggleTimer()">Start</button>
-  `;
+        function spinWheel2() {
+            const deg = Math.floor(3000 + Math.random() * 3000);
+            document.getElementById('wheel2').style.transform = `rotate(${deg}deg)`;
+            setTimeout(() => {
+                document.getElementById('display-method').innerText = "Method Selected!";
+                document.getElementById('timer-btn').style.display = "block";
+                document.getElementById('spin-btn').style.display = "none";
+            }, 4000);
+        }
 
-  drawWheel1();
-  drawWheel2();
-}
+        function toggleTimer() {
+            const btn = document.getElementById('timer-btn');
+            if (btn.innerText === "START CLOCK") {
+                btn.innerText = "STOP";
+                timerInterval = setInterval(() => {
+                    timerSeconds--;
+                    let mins = Math.floor(timerSeconds/60);
+                    let secs = timerSeconds % 60;
+                    document.getElementById('timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                    if (timerSeconds <= 0) stopGameTurn();
+                }, 1000);
+            } else {
+                stopGameTurn();
+            }
+        }
 
-/* DRAW CATEGORY WHEEL */
-const categories=["1950s-70s","1980s","1990s","2000s","2010s","2020s","Audience"];
+        function stopGameTurn() {
+            clearInterval(timerInterval);
+            // Simple prompt for scoring
+            const val = prompt("Enter Points Scored (Karaoke Yes=100, Both=50, Artist=15, Song=10, None=0)");
+            teams[turn].score += parseInt(val || 0);
+            updateScores();
+            
+            // Reset for next turn
+            turn = turn === 0 ? 1 : 0;
+            timerSeconds = 90;
+            document.getElementById('timer').innerText = "01:30";
+            document.getElementById('timer-btn').style.display = "none";
+            document.getElementById('timer-btn').innerText = "START CLOCK";
+            document.getElementById('spin-btn').style.display = "block";
+            document.getElementById('spin-btn').innerText = "SPIN CATEGORY";
+            document.getElementById('spin-btn').onclick = spinWheel1;
+            document.getElementById('wheel2').classList.add('disabled-wheel');
 
-function drawWheel1(){
-  let c=document.getElementById("wheel1");
-  let ctx=c.getContext("2d");
-  let colors=["red","orange","yellow","green","blue","purple","pink"];
+            if (turn === 0) currentRound++;
+            if (currentRound > 5) endGame();
+        }
 
-  for(let i=0;i<7;i++){
-    ctx.beginPath();
-    ctx.moveTo(125,125);
-    ctx.arc(125,125,125,i*(2*Math.PI/7),(i+1)*(2*Math.PI/7));
-    ctx.fillStyle=colors[i];
-    ctx.fill();
+        function updateScores() {
+            document.getElementById('t1-score').innerText = teams[0].score;
+            document.getElementById('t2-score').innerText = teams[1].score;
+        }
 
-    ctx.fillStyle="black";
-    ctx.fillText(categories[i],90,125);
-  }
-}
-
-/* DRAW METHOD WHEEL */
-const methods=["Karaoke","Name","Karaoke","Name","Karaoke","Name"];
-
-function drawWheel2(){
-  let c=document.getElementById("wheel2");
-  let ctx=c.getContext("2d");
-
-  for(let i=0;i<6;i++){
-    ctx.beginPath();
-    ctx.moveTo(125,125);
-    ctx.arc(125,125,125,i*(2*Math.PI/6),(i+1)*(2*Math.PI/6));
-    ctx.fillStyle=i%2==0?"white":"black";
-    ctx.fill();
-
-    ctx.fillStyle="black";
-    ctx.fillText(methods[i],90,125);
-  }
-}
-
-/* SPIN CATEGORY */
-function spinCategory(){
-  selectedCategory=categories[Math.floor(Math.random()*categories.length)];
-  document.getElementById("category").innerText=selectedCategory;
-
-  document.getElementById("spin2").disabled=false;
-  document.getElementById("wheel2").classList.remove("grey");
-}
-
-/* SPIN METHOD */
-function spinMethod(){
-  selectedMethod=methods[Math.floor(Math.random()*methods.length)];
-  document.getElementById("method").innerText=selectedMethod;
-
-  if(selectedMethod==="Karaoke"){
-    let res=confirm("Did the team sing?");
-    addScore(res?100:0);
-  } else {
-    let res=prompt("song / artist / both / none");
-    if(res==="song") addScore(10);
-    else if(res==="artist") addScore(15);
-    else if(res==="both") addScore(50);
-    else addScore(0);
-  }
-}
-
-/* SCORE */
-function addScore(points){
-  if(currentTeam===1){
-    score1+=points;
-    document.getElementById("s1").innerText=score1;
-  }else{
-    score2+=points;
-    document.getElementById("s2").innerText=score2;
-  }
-
-  nextTurn();
-}
-
-/* NEXT TURN */
-function nextTurn(){
-  if(currentTeam===1){
-    currentTeam=2;
-  }else{
-    currentTeam=1;
-    round++;
-  }
-
-  if(round>5){
-    endGame();
-    return;
-  }
-
-  document.getElementById("round").innerText=`Round ${round}/5`;
-  document.getElementById("turn").innerText=
-    currentTeam===1?`${team1}'s Turn`:`${team2}'s Turn`;
-
-  document.getElementById("spin2").disabled=true;
-  document.getElementById("wheel2").classList.add("grey");
-}
-
-/* TIMER */
-let time=90;
-let running=false;
-let interval;
-
-function toggleTimer(){
-  if(!running){
-    running=true;
-    document.getElementById("timerBtn").innerText="Stop";
-
-    interval=setInterval(()=>{
-      time--;
-      let m=Math.floor(time/60);
-      let s=time%60;
-      document.getElementById("timer").innerText=
-        m+":"+(s<10?"0"+s:s);
-
-      if(time<=0){
-        clearInterval(interval);
-      }
-    },1000);
-
-  }else{
-    running=false;
-    clearInterval(interval);
-    document.getElementById("timerBtn").innerText="Start";
-  }
-}
-
-/* END GAME */
-function endGame(){
-  let winner=score1>score2?team1:team2;
-
-  document.body.innerHTML=`
-  <div class="center">
-    <div class="winText">CONGRATULATIONS</div>
-    <h1>${winner} Wins!</h1>
-  </div>
-  `;
-}
-
-</script>
-
+        function endGame() {
+            document.getElementById('game-screen').classList.remove('active');
+            document.getElementById('end-screen').classList.add('active');
+            const winner = teams[0].score > teams[1].score ? teams[0].name : teams[1].name;
+            document.getElementById('winner-name').innerText = winner + " WINS!";
+            
+            // Rainbow Congratulations
+            const txt = document.getElementById('congrats-text');
+            txt.innerHTML = txt.innerText.split("").map(char => `<span style="color:hsl(${Math.random()*360},100%,50%)">${char}</span>`).join("");
+        }
+    </script>
 </body>
 </html>
